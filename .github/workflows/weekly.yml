@@ -1,0 +1,70 @@
+name: TrustMRR Weekly Notion Producer
+
+on:
+  schedule:
+    # Sunday 17:00 UTC = Monday 01:00 Asia/Shanghai (UTC+8).
+    - cron: '0 17 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trustmrr-weekly-notion
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python stdlib tests
+        run: python -m unittest discover -s tests -v
+      - name: Compile
+        run: python -m compileall -q trustmrr
+
+  notion-check:
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read-only Notion permission check
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_PARENT_PAGE_ID: 4109e605-ccf8-81ed-a46c-f9ab95538f5b
+        run: python -m trustmrr.main check
+
+  produce:
+    # A newly created repo is intentionally inert until cutover is approved.
+    # Old systemd weekly timer must be disabled before this gate is enabled.
+    if: github.event_name == 'schedule' && vars.TRUSTMRR_PRODUCTION_ENABLED == 'true'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TRUSTMRR_PRODUCTION_ENABLED: ${{ vars.TRUSTMRR_PRODUCTION_ENABLED }}
+      TRUSTMRR_RESEARCH_AUTHORIZED: ${{ vars.TRUSTMRR_RESEARCH_AUTHORIZED }}
+      TRUSTMRR_AI_AUTHORIZED: ${{ vars.TRUSTMRR_AI_AUTHORIZED }}
+      NOTION_ENABLE_SYNC: 'true'
+      NOTION_AUTOSYNC_AFTER_GENERATION: 'true'
+      NOTION_PARENT_PAGE_ID: 4109e605-ccf8-81ed-a46c-f9ab95538f5b
+      NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+      OMNIROUTE_BASE_URL: ${{ vars.OMNIROUTE_BASE_URL }}
+      OMNIROUTE_MODEL: ${{ vars.OMNIROUTE_MODEL }}
+      OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Produce Notion READY weekly and conditional monthly
+        run: python -m trustmrr.main produce
