@@ -1,0 +1,198 @@
+"""Weekly TrustMRR research runner for stateless GitHub Actions.
+
+Canonical Notion READY pages are the only historical store. The runner never
+creates WeChat or CMS drafts and does not maintain an on-runner SQLite database.
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import sys
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+from .article import title_for
+from .core import (
+    DISCOVERY_URL, SHANGHAI, normalize_top25, previous_week_changes,
+    week_start,
+)
+from .notion_sync import read_existing_ready, sync_article
+from .report_markdown import render_report_markdown
+from .services import ai_insights, authorize, enabled, http_json
+
+PARENT_ID = "4109e605-ccf8-81ed-a46c-f9ab95538f5b"
+SOURCE_RE = re.compile(r"https://trustmrr\.com/startup/([A-Za-z0-9-]+)")
+HEADING_RE = re.compile(r"^(\d{1,2})\.\s+(.+)$")
+
+
+def report_identity(kind: str, monday: date) -> tuple[str, str, str]:
+    if monday.weekday() != 0:
+        raise ValueError("Period must be a Monday")
+    label, external = (
+        ("trustmrr-weekly", monday.isoformat())
+        if kind == "weekly" else ("trustmrr-monthly", monday.strftime("%Y-%m"))
+    )
+    prefix = external + ("｜TrustMRR 周报｜" if kind == "weekly" else "｜TrustMRR 月报｜")
+    title = prefix + title_for(
+        ("weekly:" if kind == "weekly" else "monthly:") + external,
+        monthly=(kind == "monthly"),
+    )
+    return label + ":" + external, prefix, title
+
+
+def prior_ranking(markdown: str) -> list[dict]:
+    """Extract the canonical TrustMRR source URLs from an existing READY article.
+
+    No JSON cache is committed to the public repository. Only exact 25/25 rows
+    are accepted, otherwise monthly statistics are not manufactured.
+    """
+    if "## TrustMRR 增长 Top 25" not in markdown:
+        raise ValueError("Weekly Notion report lacks Top 25")
+    seen, result, rank, name = set(), [], None, ""
+    in_list = False
+    for line in markdown.splitlines():
+        if line.strip() == "## TrustMRR 增长 Top 25":
+            in_list = True
+            continue
+        if in_list and line.startswith("## "):
+            break
+        if not in_list:
+            continue
+        match = HEADING_RE.match(line)
+        if match:
+            rank = int(match.group(1))
+            name = re.sub(r"<[^>]+>|[*_\\]", "", match.group(2)).strip()
+            continue
+        matched = SOURCE_RE.search(line)
+        if matched and rank is not None:
+            slug = matched.group(1)
+            if rank < 1 or rank > 25 or slug in seen:
+                raise ValueError("Invalid rank or duplicate slug in Notion history")
+            seen.add(slug)
+            result.append({"rank": rank, "slug": slug, "name": name[:100] or slug})
+            rank = None
+    if len(result) != 25 or [r["rank"] for r in result] != list(range(1, 26)):
+        raise ValueError("Historical Notion Top25 is incomplete")
+    return result
+
+
+def historical_week(monday: date) -> list[dict] | None:
+    key, prefix, _ = report_identity("weekly", monday)
+    markdown = read_existing_ready(key, prefix)
+    return None if markdown is None else prior_ranking(markdown)
+
+
+def write_period(kind: str, monday: date, rows: list[dict], comparison: dict) -> str:
+    key, prefix, title = report_identity(kind, monday)
+    existing = read_existing_ready(key, prefix)
+    if existing is not None:
+        return "ALREADY_READY " + key
+    insights = ai_insights(rows, comparison, kind)
+    markdown = render_report_markdown(
+        period=("weekly:" if kind == "weekly" else "monthly:")
+        + (monday.isoformat() if kind == "weekly" else monday.strftime("%Y-%m")),
+        title=title_for(
+            ("weekly:" if kind == "weekly" else "monthly:")
+            + (monday.isoformat() if kind == "weekly" else monday.strftime("%Y-%m")),
+            monthly=(kind == "monthly"),
+        ),
+        records=rows, insights=insights, monthly=(kind == "monthly"),
+    )
+    result = sync_article(
+        source_key=key, title=title, unique_prefix=prefix, markdown=markdown,
+    )
+    return str(result["result"]) + " " + key
+
+
+def month_candidate(monday: date) -> bool:
+    return monday.weekday() == 0 and monday.day <= 7
+
+
+def produce(monday: date) -> list[str]:
+    if monday.weekday() != 0:
+        raise ValueError("TrustMRR weekly production requires a Monday")
+    if not enabled("TRUSTMRR_PRODUCTION_ENABLED"):
+        raise PermissionError("TRUSTMRR_PRODUCTION_ENABLED must explicitly be true")
+    authorize("TRUSTMRR_RESEARCH_AUTHORIZED", "TRUSTMRR_AI_AUTHORIZED")
+    if not enabled("NOTION_ENABLE_SYNC") or not enabled("NOTION_AUTOSYNC_AFTER_GENERATION"):
+        raise PermissionError("Notion READY handoff is not enabled")
+    parent_id = os.getenv("NOTION_PARENT_PAGE_ID", "")
+    if parent_id.lower() != PARENT_ID:
+        raise ValueError("Unexpected Notion parent page")
+    week_key, week_prefix, _ = report_identity("weekly", monday)
+    existing = read_existing_ready(week_key, week_prefix)
+    current = None
+    results = []
+    if existing is not None:
+        current = prior_ranking(existing)
+        results.append("ALREADY_READY " + week_key)
+    else:
+        previous = historical_week(monday - timedelta(days=7))
+        payload = http_json(DISCOVERY_URL)
+        current = normalize_top25(payload)
+        ranked = previous_week_changes(current, previous or [])
+        results.append(write_period("weekly", monday, ranked, {
+            "has_prior_week": bool(previous),
+            "rank_delta": "prior position minus current position, not revenue growth",
+        }))
+        # Monthly ranking must come from Notion's confirmed weekly artifact.
+        current = historical_week(monday)
+    if not month_candidate(monday):
+        return results
+    snapshots = [current]
+    for offset in (1, 2, 3):
+        earlier = historical_week(monday - timedelta(days=7 * offset))
+        if earlier is None:
+            results.append("MONTHLY_SKIPPED insufficient consecutive READY history")
+            return results
+        snapshots.append(earlier)
+    if any(not week or len(week) != 25 for week in snapshots):
+        raise ValueError("Invalid monthly weekly history")
+    frequencies: dict[str, dict] = {}
+    for weekly_rows in snapshots:
+        for row in weekly_rows:
+            item = frequencies.setdefault(
+                row["slug"], {"name": row["name"], "slug": row["slug"], "appearances": 0}
+            )
+            item["appearances"] += 1
+    monthly_rows = sorted(
+        frequencies.values(), key=lambda r: (-r["appearances"], r["name"])
+    )[:10]
+    results.append(write_period("monthly", monday, monthly_rows, {
+        "period": "four consecutive weekly Top25 snapshots",
+        "note": "appearance frequency is not growth or profit",
+    }))
+    return results
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="TrustMRR GitHub Actions Notion producer")
+    parser.add_argument(
+        "command", choices=("check", "produce"),
+        help="check verifies safe Notion access only; produce makes canonical READY articles",
+    )
+    args = parser.parse_args(argv)
+    try:
+        local_today = datetime.now(SHANGHAI).date()
+        monday = week_start(local_today)
+        if args.command == "check":
+            if os.getenv("NOTION_PARENT_PAGE_ID", "").lower() != PARENT_ID:
+                raise ValueError("Unexpected Notion parent page")
+            key, prefix, _ = report_identity("weekly", monday)
+            page = read_existing_ready(key, prefix)
+            print("CHECK_OK Notion readable", "READY" if page else "NO_CURRENT_READY")
+            return 0
+        if local_today.weekday() != 0:
+            raise ValueError("Production date is not a Beijing Monday; no backfill")
+        for line in produce(monday):
+            print(line)
+        return 0
+    except (ValueError, PermissionError, RuntimeError) as exc:
+        print("ERROR", type(exc).__name__, str(exc).replace("\n", " ")[:240],
+              file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
