@@ -1,6 +1,10 @@
 name: TrustMRR Weekly Notion Producer
 
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   schedule:
     # Sunday 17:00 UTC = Monday 01:00 Asia/Shanghai (UTC+8).
     - cron: '0 17 * * 0'
