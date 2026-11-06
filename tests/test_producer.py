@@ -97,6 +97,19 @@ class RenderTests(unittest.TestCase):
         self.assertNotIn("**BAD** [hack]", md)
 
 
+class NetworkSafetyTests(unittest.TestCase):
+    @patch.dict("os.environ", {
+        "TRUSTMRR_AI_AUTHORIZED": "true",
+        "OMNIROUTE_BASE_URL": "http://invalid.example",
+        "OMNIROUTE_API_KEY": "dummy",
+        "OMNIROUTE_MODEL": "dummy-model",
+    })
+    def test_model_credentials_refuse_plain_http(self):
+        from trustmrr.services import ai_insights
+        with self.assertRaises(ValueError):
+            ai_insights([], {}, "weekly")
+
+
 class OrchestrationTests(unittest.TestCase):
     @patch("trustmrr.main.read_existing_ready", return_value=None)
     @patch.dict("os.environ", {
