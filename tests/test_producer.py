@@ -8,7 +8,7 @@ from trustmrr.core import (
     normalize_top25, previous_week_changes, week_start,
 )
 from trustmrr.main import (
-    report_identity, prior_ranking, month_candidate, produce,
+    report_identity, prior_ranking, month_candidate, produce, historical_week,
 )
 from trustmrr.report_markdown import render_report_markdown
 
@@ -119,6 +119,18 @@ class OrchestrationTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             produce(date(2026, 11, 9))
         read.assert_not_called()
+
+    @patch("trustmrr.main.read_existing_ready", side_effect=RuntimeError(
+        "Existing report period lacks correct READY; manual reconciliation required"))
+    def test_legacy_history_without_ready_is_skipped(self, read):
+        self.assertIsNone(historical_week(date(2026, 11, 2)))
+        read.assert_called_once()
+
+    @patch("trustmrr.main.read_existing_ready", side_effect=RuntimeError(
+        "Historical Notion READY digest mismatch"))
+    def test_tampered_history_is_not_trusted(self, read):
+        with self.assertRaises(RuntimeError):
+            historical_week(date(2026, 11, 2))
 
     def test_derived_weekly_not_revenue_growth(self):
         current = normalize_top25({"fastestGrowingStartups": sample_rows()})
