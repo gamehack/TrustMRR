@@ -79,7 +79,15 @@ def prior_ranking(markdown: str) -> list[dict]:
 
 def historical_week(monday: date) -> list[dict] | None:
     key, prefix, _ = report_identity("weekly", monday)
-    markdown = read_existing_ready(key, prefix)
+    try:
+        markdown = read_existing_ready(key, prefix)
+    except RuntimeError as exc:
+        # Legacy Notion pages (including 2026-11-02) predate the READY marker.
+        # Treat them as unavailable comparison history, never as verified Top25.
+        # An existing current-period page is still handled strictly in produce().
+        if str(exc) == "Existing report period lacks correct READY; manual reconciliation required":
+            return None
+        raise
     return None if markdown is None else prior_ranking(markdown)
 
 
