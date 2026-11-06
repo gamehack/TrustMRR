@@ -1,0 +1,10 @@
+# Local secrets and temporary output
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.pytest_cache/
+output/
+data/
+*.sqlite
