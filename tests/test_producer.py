@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 from unittest.mock import patch
 
 from trustmrr.core import (
-    normalize_top25, previous_week_changes, week_start, four_week_frequency,
+    normalize_top25, previous_week_changes, week_start,
 )
 from trustmrr.main import (
     report_identity, prior_ranking, month_candidate, produce,
