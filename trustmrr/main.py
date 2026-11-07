@@ -176,15 +176,15 @@ def produce(monday: date) -> list[str]:
 
 def write_test() -> dict[str, str]:
     """Write one clearly labeled, idempotent Notion integration-test page."""
-    source_key = "trustmrr-test:2026-11-07"
-    unique_prefix = "联调测试｜2026-11-07｜"
+    source_key = "trustmrr-test-v2:2026-11-07"
+    unique_prefix = "联调测试｜2026-11-07-v2｜"
     title = unique_prefix + "Notion 写入与 READY 回读验证"
     markdown = (
         "# Notion 写入与 READY 回读验证\n\n"
         "本页由 TrustMRR GitHub Actions 的一次性联调任务创建。\n\n"
         "- 测试范围：Notion 子页面创建、标题与父页面校验、Markdown 全文回读、SHA-256 校验、READY 标记写入及最终回读。\n"
         "- 本页不是正式周报，不会被 TrustMRR 周报发布器或下游公众号/CMS 发布器识别。\n"
-        "- 本页使用独立的 trustmr-test source_key；重复执行会校验现有 READY 内容，不会覆盖页面。\n"
+        "- 本页使用独立测试唯一键；重复执行会校验现有 READY 内容，不会覆盖页面。\n"
     )
     return sync_article(
         source_key=source_key,
