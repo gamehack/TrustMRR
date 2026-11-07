@@ -302,7 +302,7 @@ def read_existing_ready(source_key: str, unique_prefix: str) -> str | None:
         return None
     raw = _read_markdown(found["id"], token)
     lines = raw.rstrip("\n").split("\n")
-    match = _READY_RE.fullmatch(lines[-1]) if lines else None
+    match = _READY_RE.fullmatch(lines[-1].strip().replace(r"\_", "_")) if lines else None
     if match is None or match.group("source") != source_key:
         raise RuntimeError("Existing report period lacks correct READY; manual reconciliation required")
     signed = _canonical("\n".join(lines[:-1]))
