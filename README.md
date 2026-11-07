@@ -7,7 +7,7 @@
 - 研究：OmniRoute Chat Completions；对原始产品字段防提示注入，不推断未提供的利润、获客成本、留存或真实收入。
 - 存储：Notion 专栏「09 · 潜界 AI｜TrustMRR 增长情报」是文章和历史的唯一持久存储。每篇写入成功后回读全文、校验 SHA-256，并在末尾标记机器可验证 READY。
 - 月报：当月第一个周一，连续四期 Notion 周报均为有效 READY 且包含完整 Top25 排名时生成；否则明确跳过。
-- 下游：现有的 qjai-text-publisher 周一**03:00**只读取 Notion 的 READY 周报或月报，分别创建微信公众号与 CMS 草稿。此仓库绝不直写微信/CMS。
+- 下游：[mp-publisher](https://github.com/gamehack/mp-publisher) 周一 **03:00** 在硅谷容器中写微信公众号草稿；[cms-publisher](https://github.com/gamehack/cms-publisher) 周一 **04:15** 在 GitHub Actions 中独立写 CMS 草稿。二者仅消费有效 READY，本仓库绝不直写微信/CMS。
 
 ## 安全启动：分阶段切换
 
@@ -16,11 +16,11 @@
 1. 在新仓库 Settings → Secrets and variables → Actions → **Repository secrets** 配置：NOTION_API_KEY、OMNIROUTE_API_KEY。
 2. 在 **Repository variables** 配置：OMNIROUTE_BASE_URL、OMNIROUTE_MODEL、TRUSTMRR_RESEARCH_AUTHORIZED=true、TRUSTMRR_AI_AUTHORIZED=true。授权开关仅表示用户已取得对应用途的书面许可，不意味着由本项目自行取得。
 3. 先通过显式提交消息包含 `[live-preflight]` 触发一次真实接口预检：只读 Notion 专栏、请求 TrustMRR Top25、调用 OmniRoute、校验文章渲染；不创建 Notion 页面，不写 READY。后续也可手动 workflow_dispatch 执行只读 Notion 检查。 2026-11-07 首次真实预检已通过：[run 42324977476](https://github.com/gamehack/TrustMRR/actions/runs/42324977476)，Notion 只读访问 OK、TrustMRR 返回 25 条、OmniRoute 返回 5 条观察、文章渲染通过。随后 [run 42326546993](https://github.com/gamehack/TrustMRR/actions/runs/42326546993) 完成 Notion 写入与 READY 幂等测试。最后 [完整端到端 run 42327562166](https://github.com/gamehack/TrustMRR/actions/runs/42327562166) 真实调用 TrustMRR Top25、OmniRoute、渲染 25 条报告并写入 Notion READY，结果 created_ready；[重复执行 run 42327861094](https://github.com/gamehack/TrustMRR/actions/runs/42327861094) 返回 duplicate_ready，不重复调用 AI 或创建页面。完整报告测试页：[E2E v2](https://app.notion.com/p/4119e605ccf881608303d977804da331)。
-4. **旧项目服务器侧已于 2026-11-07 完成退役**：旧 qjai-trustmrr-weekly.timer 已 disable --now；service/timer unit 已删除并 daemon-reload；/opt/qjai-TrustMRR-mp-publisher 已删除；未发现专属备份；专属 Docker 镜像在确认零容器引用后删除。其他容器、traefik_default、qjai-text-publisher、qjai-cms 均未受影响。详细结果见 [Notion 旧项目退役记录](https://app.notion.com/p/40b9e605ccf881c28494d6750137a87b)。
-5. **2026-11-07：旧项目切换与新项目生产门禁启用已完成**。旧私有仓库 gamehack/qjai-TrustMRR-mp-publisher 已删除（复核 GitHub API 对精确仓库返回 404）；旧服务器 timer、unit、部署目录及专属 Docker 镜像已清理。用户确认已在新仓库 Settings → Secrets and variables → Actions → Repository variables 设置 TRUSTMRR_PRODUCTION_ENABLED=true。当前 GitHub 连接器不提供 Actions Variables 读取权限，无法独立读取该值；以用户完成确认作为配置依据，最终由下一次自然 schedule 验证。生产调度每周一北京时间 01:00，Notion 完整 READY 后由 03:00 下游创建微信/CMS 双草稿。
+4. **旧项目服务器侧已于 2026-11-07 完成退役**：旧 qjai-trustmrr-weekly.timer 已 disable --now；service/timer unit 已删除并 daemon-reload；/opt/qjai-TrustMRR-mp-publisher 已删除；未发现专属备份；专属 Docker 镜像在确认零容器引用后删除。其他容器、traefik_default、当时仍在使用的统一发布器和 qjai-cms 均未受影响。后者的旧服务器部署已于 2026-11-08 单独退役。详细结果见 [Notion 旧项目退役记录](https://app.notion.com/p/40b9e605ccf881c28494d6750137a87b)。
+5. **2026-11-07：旧项目切换与新项目生产门禁启用已完成**。旧私有仓库 gamehack/qjai-TrustMRR-mp-publisher 已删除（复核 GitHub API 对精确仓库返回 404）；旧服务器 timer、unit、部署目录及专属 Docker 镜像已清理。用户确认已在新仓库 Settings → Secrets and variables → Actions → Repository variables 设置 TRUSTMRR_PRODUCTION_ENABLED=true。当前 GitHub 连接器不提供 Actions Variables 读取权限，无法独立读取该值；以用户完成确认作为配置依据，最终由下一次自然 schedule 验证。生产调度每周一北京时间 01:00，Notion 完整 READY 后由 03:00 的 mp-publisher 创建微信草稿、04:15 的 cms-publisher 创建 CMS 草稿。
 6. 若首次自然执行失败，保持旧项目停用；检查失败原因并人工处理，不自动重放/补投，也不恢复旧链路并行。
 
-> 2026-11-09 是下一次周一。GitHub schedule 可能延迟，03:00 前未 READY 时统一发布器安全跳过，不会改用旧报告补发。生产开关未打开时 schedule 只跑离线测试，不创建文章。
+> 2026-11-09 是下一次周一。GitHub schedule 可能延迟；03:00 微信或 04:15 CMS 检查时仍未 READY 则各自安全跳过，不会改用旧报告补发。生产开关未打开时上游 schedule 只跑离线测试。
 
 ## 操作命令
 
@@ -42,7 +42,7 @@ check 只验证 Notion 父页面只读权限；preflight 真实调用 TrustMRR �
 | 周报 | YYYY-MM-DD｜TrustMRR 周报｜独立产品增长观察｜MM-DD | trustmrr-weekly:YYYY-MM-DD |
 | 月报 | YYYY-MM｜TrustMRR 月报｜独立产品增长趋势｜YYYY-MM 四周观察 | trustmrr-monthly:YYYY-MM |
 
-Notion 文章正文以最终机器标记 QJAI_PUBLISH_READY v=1 source_key=... content_sha256=... 结束，内容 Hash 使用 Notion 实际回读文本（不包含最后 READY 行），与统一发布器保持一致。Notion Markdown v2 会将 inline code 序列化为 `<code>` 并转义 READY 标记中的下划线；写入端已按 Markdown 语义归一化正文比较，并在 READY 校验时还原 `\\_`，与 qjai-text-publisher 的 split_ready 规则兼容。
+Notion 文章正文以最终机器标记 QJAI_PUBLISH_READY v=1 source_key=... content_sha256=... 结束，内容 Hash 使用 Notion 实际回读文本（不包含最后 READY 行），与统一发布器保持一致。Notion Markdown v2 会将 inline code 序列化为 `<code>` 并转义 READY 标记中的下划线；写入端已按 Markdown 语义归一化正文比较，并在 READY 校验时还原 `\\_`，与现行 mp-publisher 和 cms-publisher 的 READY 内容校验约定兼容。
 
 本项目不用 GitHub Artifacts、Cache 或提交公开 JSON 保存原始产品快照：每期从 Notion 的 READY 周报来源链接恢复前一周排名，并用连续四期计算月报入榜频次。历史不完整、文章被修改或来源行无法唯一对应时 fail-closed，不补造排名。定时为固定一次，没有自动追赶（catch-up）、重复 AI 生产或直接发布 API。
 
