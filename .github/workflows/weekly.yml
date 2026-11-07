@@ -88,54 +88,6 @@ jobs:
       - name: Create and verify labeled Notion test page
         run: python -m trustmrr.main write-test
 
-  activate-production:
-    # One-time cutover: only a commit explicitly tagged [activate-production] may enable the repo variable.
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[activate-production]')
-    needs: test
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      actions: write
-    steps:
-      - name: Enable and verify scheduled production variable
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          variable_url="https://api.github.com/repos/${REPOSITORY}/actions/variables/TRUSTMRR_PRODUCTION_ENABLED"
-          collection_url="https://api.github.com/repos/${REPOSITORY}/actions/variables"
-          code="$(curl --silent --show-error --output /tmp/variable.json --write-out '%{http_code}' \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "${variable_url}")"
-          if [ "${code}" = "200" ]; then
-            curl --fail --silent --show-error --request PATCH "${variable_url}" \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              -H "Content-Type: application/json" \
-              --data '{"name":"TRUSTMRR_PRODUCTION_ENABLED","value":"true"}' >/dev/null
-          elif [ "${code}" = "404" ]; then
-            curl --fail --silent --show-error --request POST "${collection_url}" \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              -H "Content-Type: application/json" \
-              --data '{"name":"TRUSTMRR_PRODUCTION_ENABLED","value":"true"}' >/dev/null
-          else
-            echo "Unable to inspect repository variable; HTTP ${code}"
-            exit 1
-          fi
-          value="$(curl --fail --silent --show-error "${variable_url}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            | python -c 'import json,sys; print(json.load(sys.stdin).get("value", ""))')"
-          test "${value}" = "true"
-          echo "TRUSTMRR_PRODUCTION_ENABLED=true verified"
-
   full-integration-test:
     # Real TrustMRR -> OmniRoute -> Notion READY chain; isolated test key/title, no publisher match.
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[full-integration-test]')
