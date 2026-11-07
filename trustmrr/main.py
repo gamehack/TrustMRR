@@ -196,8 +196,8 @@ def write_test() -> dict[str, str]:
 
 def integration_test() -> dict[str, object]:
     """Run real TrustMRR -> OmniRoute -> report render -> Notion READY end to end (isolated test; v1)."""
-    source_key = "trustmrr-e2e-test:2026-11-07"
-    unique_prefix = "联调测试｜2026-11-07-e2e｜"
+    source_key = "trustmrr-e2e-test-v2:2026-11-07"
+    unique_prefix = "联调测试｜2026-11-07-e2e-v2｜"
     title = unique_prefix + "真实 Top25 与 AI 研究完整链路"
     if os.getenv("NOTION_PARENT_PAGE_ID", "").lower() != PARENT_ID:
         raise ValueError("Unexpected Notion parent page")
