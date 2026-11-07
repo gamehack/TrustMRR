@@ -29,9 +29,10 @@ Python 3.12+，仅标准库：
     python -m unittest discover -s tests -v
     python -m trustmrr.main check
     python -m trustmrr.main preflight
+    python -m trustmrr.main write-test
     python -m trustmrr.main produce
 
-check 只验证 Notion 父页面只读权限；preflight 真实调用 TrustMRR 与 OmniRoute 并检查报告渲染，明确不写 Notion；produce 仅允许北京时间周一执行，且要求 TRUSTMRR_PRODUCTION_ENABLED=true、TRUSTMRR_RESEARCH_AUTHORIZED=true、TRUSTMRR_AI_AUTHORIZED=true、NOTION_ENABLE_SYNC=true、NOTION_AUTOSYNC_AFTER_GENERATION=true。Notion 父页面固定为 4109e605-ccf8-81ed-a46c-f9ab95538f5b，不允许运行时意外指向其它页面。
+check 只验证 Notion 父页面只读权限；preflight 真实调用 TrustMRR 与 OmniRoute 并检查报告渲染，明确不写 Notion；write-test 使用独立 trustmrr-test-v2 唯一键创建一篇明确标记的测试子页，并验证标题/父页面、Markdown 全文回读、SHA-256 与 READY 回读；重复运行只校验现有测试页，不覆盖内容；produce 仅允许北京时间周一执行，且要求 TRUSTMRR_PRODUCTION_ENABLED=true、TRUSTMRR_RESEARCH_AUTHORIZED=true、TRUSTMRR_AI_AUTHORIZED=true、NOTION_ENABLE_SYNC=true、NOTION_AUTOSYNC_AFTER_GENERATION=true。Notion 父页面固定为 4109e605-ccf8-81ed-a46c-f9ab95538f5b，不允许运行时意外指向其它页面。
 
 ## 运行协议
 
