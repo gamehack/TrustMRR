@@ -215,7 +215,7 @@ def sync_article(*, source_key: str, title: str, markdown: str,
         # existing child's immutable READY handshake and content digest.
         existing = _read_markdown(found["id"], token)
         lines = existing.rstrip("\n").split("\n")
-        match = _READY_RE.fullmatch(lines[-1].strip().replace(r"\\_", "_")) if lines else None
+        match = _READY_RE.fullmatch(lines[-1].strip().replace(r"\_", "_")) if lines else None
         if match is None or match.group("source") != source_key:
             raise RuntimeError("Existing Notion period page lacks a valid READY marker; reconcile manually")
         signed_body = _canonical("\n".join(lines[:-1]))
@@ -256,7 +256,7 @@ def sync_article(*, source_key: str, title: str, markdown: str,
     marker = _append_ready(page_id, source_key, verified_digest, token)
     final = _read_markdown(page_id, token)
     lines = final.rstrip().split("\n")
-    final_marker = lines[-1].strip().replace(r"\\_", "_") if lines else ""
+    final_marker = lines[-1].strip().replace(r"\_", "_") if lines else ""
     if not lines or not _READY_RE.fullmatch(final_marker) or final_marker != marker:
         raise RuntimeError("Notion READY marker did not round-trip")
     verified_body = _canonical("\n".join(lines[:-1]))
