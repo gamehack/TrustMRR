@@ -11,7 +11,7 @@ import json
 import os
 import re
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from uuid import UUID
 
@@ -136,12 +136,25 @@ def _canonical(markdown: str) -> str:
 
 
 def _comparison_form(markdown: str) -> str:
-    """Compare Markdown v2 semantics across Notion's code-tag/escape serialization."""
+    """Compare Markdown v2 semantics across Notion's rich-text serialization."""
     value = _canonical(markdown)
-    value = re.sub(r"<code>(.*?)</code>", r"`\1`", value, flags=re.DOTALL)
-    # Notion escapes literal Markdown punctuation in readback; those escapes
-    # do not change the rendered content and must not invalidate the digest.
-    return re.sub(r"\\([\\`*_{}\[\]()#+.!|<>~-])", r"\1", value)
+    value = re.sub(r"\x60([^\x60\n]+)\x60", lambda m: "<code>" + m.group(1) + "</code>", value)
+    value = re.sub(r"<b>(.*?)</b>", r"**\1**", value, flags=re.DOTALL)
+
+    def unwrap_notion_autolink(match: re.Match[str]) -> str:
+        label, destination = match.group(1), match.group(2)
+        label_text = re.sub(r"[*_]", "", label).strip()
+        host = urlsplit(destination).netloc
+        if host and label_text.lower().removeprefix("www.") == host.lower().removeprefix("www."):
+            return label
+        return match.group(0)
+
+    # Notion may auto-link a product name that is itself a domain. Treat only
+    # host-equals-label links as text; preserve all actual source hyperlinks.
+    value = re.sub(r"\[([^\]]+)\]\((https?://[^)]+)\)", unwrap_notion_autolink, value)
+    # Notion escapes literal Markdown punctuation in readback; remove only
+    # those presentation escapes before comparing rendered meaning.
+    return re.sub(r"\\([\\\x60*_{}\[\]()#+.!|<>~$-])", r"\1", value)
 
 
 def _read_markdown(page_id: str, token: str) -> str:
