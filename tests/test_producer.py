@@ -22,6 +22,10 @@ def sample_rows():
 
 
 class NotionMarkdownTests(unittest.TestCase):
+    def test_markdown_v2_bold_autolinks_and_dollar_escapes_are_equivalent(self):
+        expected = "1. **ECOMSTATEMENT\\.COM**\\n   - Price US\\$2.00\\n"
+        actual = "1. [<b>ECOMSTATEMENT.COM</b>](http://ECOMSTATEMENT.COM)\\n   - Price US\\$2.00\\n"
+        self.assertEqual(_comparison_form(expected), _comparison_form(actual))
     def test_markdown_v2_code_tags_and_escaped_underscores_are_equivalent(self):
         expected = "> Archive key: `trustmrr-test:2026-11-07`.\n\n- source_key\n"
         actual = "> Archive key: <code>trustmrr-test:2026-11-07</code>.\n\n- source\\_key\n"
@@ -83,6 +87,17 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(parsed[-1]["slug"], "product-25")
         self.assertEqual(parsed[-1]["rank"], 25)
 
+    def test_two_digit_rank_bullets_keep_nested_indentation(self):
+        rows = normalize_top25({"fastestGrowingStartups": sample_rows()})
+        markdown = render_report_markdown(
+            period="weekly:2026-11-09", title="TrustMRR weekly",
+            records=previous_week_changes(rows, []),
+            insights={"overview": "概述", "observations": ["一", "二", "三"]},
+        )
+        lines = markdown.splitlines()
+        rank_ten = lines.index("10. **Product 10**")
+        self.assertTrue(lines[rank_ten + 1].startswith("    - "))
+        self.assertTrue(lines[rank_ten + 2].startswith("    - "))
     def test_monthly_report(self):
         rows = [{"slug": "product-1", "name": "Product 1", "appearances": 4}]
         markdown = render_report_markdown(
@@ -186,7 +201,7 @@ class OrchestrationTests(unittest.TestCase):
         self.assertIn("不是正式周报", sync.call_args.kwargs["markdown"])
 
     @patch("trustmrr.main.sync_article", return_value={
-        "result": "created_ready", "source_key": "trustmrr-e2e-test:2026-11-07",
+        "result": "created_ready", "source_key": "trustmrr-e2e-test-v2:2026-11-07",
         "page_id": "00000000-0000-4000-8000-000000000002",
         "page_url": "https://www.notion.so/e2e-test",
     })
@@ -208,7 +223,7 @@ class OrchestrationTests(unittest.TestCase):
         result = integration_test()
         self.assertEqual(result["top25"], 25)
         self.assertEqual(result["observations"], 3)
-        self.assertEqual(result["source_key"], "trustmrr-e2e-test:2026-11-07")
+        self.assertEqual(result["source_key"], "trustmrr-e2e-test-v2:2026-11-07")
         self.assertIn("TrustMRR 增长 Top 25", writer.call_args.kwargs["markdown"])
         api.assert_called_once()
         model.assert_called_once()
