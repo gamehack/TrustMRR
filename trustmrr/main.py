@@ -176,8 +176,8 @@ def produce(monday: date) -> list[str]:
 
 def write_test() -> dict[str, str]:
     """Write one clearly labeled, idempotent Notion integration-test page."""
-    source_key = "trustmrr-test-v2:2026-11-07"
-    unique_prefix = "联调测试｜2026-11-07-v2｜"
+    source_key = "trustmrr-test-v3:2026-11-07"
+    unique_prefix = "联调测试｜2026-11-07-v3｜"
     title = unique_prefix + "Notion 写入与 READY 回读验证"
     markdown = (
         "# Notion 写入与 READY 回读验证\n\n"
