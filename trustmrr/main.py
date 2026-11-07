@@ -174,6 +174,26 @@ def produce(monday: date) -> list[str]:
     return results
 
 
+def write_test() -> dict[str, str]:
+    """Write one clearly labeled, idempotent Notion integration-test page."""
+    source_key = "trustmrr-test:2026-11-07"
+    unique_prefix = "联调测试｜2026-11-07｜"
+    title = unique_prefix + "Notion 写入与 READY 回读验证"
+    markdown = (
+        "# Notion 写入与 READY 回读验证\n\n"
+        "本页由 TrustMRR GitHub Actions 的一次性联调任务创建。\n\n"
+        "- 测试范围：Notion 子页面创建、标题与父页面校验、Markdown 全文回读、SHA-256 校验、READY 标记写入及最终回读。\n"
+        "- 本页不是正式周报，不会被 TrustMRR 周报发布器或下游公众号/CMS 发布器识别。\n"
+        "- 本页使用独立的 trustmr-test source_key；重复执行会校验现有 READY 内容，不会覆盖页面。\n"
+    )
+    return sync_article(
+        source_key=source_key,
+        title=title,
+        unique_prefix=unique_prefix,
+        markdown=markdown,
+    )
+
+
 def preflight(target_monday: date | None = None) -> dict:
     """Exercise live TrustMRR, OmniRoute and Notion-read paths without writing."""
     authorize("TRUSTMRR_RESEARCH_AUTHORIZED", "TRUSTMRR_AI_AUTHORIZED")
@@ -214,8 +234,8 @@ def preflight(target_monday: date | None = None) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="TrustMRR GitHub Actions Notion producer")
     parser.add_argument(
-        "command", choices=("check", "preflight", "produce"),
-        help="check verifies Notion read access; preflight tests live APIs without writes; produce writes READY articles",
+        "command", choices=("check", "preflight", "write-test", "produce"),
+        help="check verifies Notion read access; preflight tests live APIs without writes; write-test verifies a labeled Notion READY write; produce writes reports",
     )
     args = parser.parse_args(argv)
     try:
@@ -233,6 +253,15 @@ def main(argv: list[str] | None = None) -> int:
                   "ai_observations=" + str(result["ai_observations"]),
                   "markdown_chars=" + str(result["markdown_chars"]),
                   "target_period=" + result["target_period"], "notion_write=not_attempted")
+            return 0
+        if args.command == "write-test":
+            if os.getenv("NOTION_PARENT_PAGE_ID", "").lower() != PARENT_ID:
+                raise ValueError("Unexpected Notion parent page")
+            if not enabled("NOTION_ENABLE_SYNC"):
+                raise PermissionError("NOTION_ENABLE_SYNC must explicitly be true")
+            result = write_test()
+            print("WRITE_TEST_OK", result["result"], "source_key=" + result["source_key"],
+                  "page_id=" + result["page_id"], "page_url=" + result["page_url"])
             return 0
         if local_today.weekday() != 0:
             raise ValueError("Production date is not a Beijing Monday; no backfill")
