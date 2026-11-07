@@ -194,6 +194,50 @@ def write_test() -> dict[str, str]:
     )
 
 
+def integration_test() -> dict[str, object]:
+    """Run real TrustMRR -> OmniRoute -> report render -> Notion READY end to end."""
+    source_key = "trustmrr-e2e-test:2026-11-07"
+    unique_prefix = "联调测试｜2026-11-07-e2e｜"
+    title = unique_prefix + "真实 Top25 与 AI 研究完整链路"
+    if os.getenv("NOTION_PARENT_PAGE_ID", "").lower() != PARENT_ID:
+        raise ValueError("Unexpected Notion parent page")
+    if not enabled("NOTION_ENABLE_SYNC"):
+        raise PermissionError("NOTION_ENABLE_SYNC must explicitly be true")
+    authorize("TRUSTMRR_RESEARCH_AUTHORIZED", "TRUSTMRR_AI_AUTHORIZED")
+    existing = read_existing_ready(source_key, unique_prefix)
+    if existing is not None:
+        result = sync_article(
+            source_key=source_key, title=title, unique_prefix=unique_prefix,
+            markdown=existing,
+        )
+        return {"result": result["result"], "source_key": source_key,
+                "page_id": result["page_id"], "page_url": result["page_url"],
+                "top25": "already_ready", "observations": "already_ready"}
+
+    payload = http_json(DISCOVERY_URL)
+    rows = normalize_top25(payload)
+    insights = ai_insights(rows, {
+        "mode": "live end-to-end integration test; no previous READY ranking",
+        "rank_delta": "not calculated for this test",
+    }, "weekly")
+    target_period = "weekly:2026-11-09"
+    markdown = render_report_markdown(
+        period=target_period,
+        title=title_for(target_period, monthly=False),
+        records=previous_week_changes(rows, []),
+        insights=insights,
+        monthly=False,
+    )
+    result = sync_article(
+        source_key=source_key, title=title, unique_prefix=unique_prefix,
+        markdown=markdown,
+    )
+    return {"result": result["result"], "source_key": source_key,
+            "page_id": result["page_id"], "page_url": result["page_url"],
+            "top25": len(rows), "observations": len(insights["observations"]),
+            "markdown_chars": len(markdown)}
+
+
 def preflight(target_monday: date | None = None) -> dict:
     """Exercise live TrustMRR, OmniRoute and Notion-read paths without writing."""
     authorize("TRUSTMRR_RESEARCH_AUTHORIZED", "TRUSTMRR_AI_AUTHORIZED")
@@ -234,8 +278,8 @@ def preflight(target_monday: date | None = None) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="TrustMRR GitHub Actions Notion producer")
     parser.add_argument(
-        "command", choices=("check", "preflight", "write-test", "produce"),
-        help="check verifies Notion read access; preflight tests live APIs without writes; write-test verifies a labeled Notion READY write; produce writes reports",
+        "command", choices=("check", "preflight", "write-test", "integration-test", "produce"),
+        help="check verifies Notion read access; preflight tests live APIs without writes; write-test verifies Notion READY writes; integration-test runs the full live chain; produce writes reports",
     )
     args = parser.parse_args(argv)
     try:
@@ -262,6 +306,12 @@ def main(argv: list[str] | None = None) -> int:
             result = write_test()
             print("WRITE_TEST_OK", result["result"], "source_key=" + result["source_key"],
                   "page_id=" + result["page_id"], "page_url=" + result["page_url"])
+            return 0
+        if args.command == "integration-test":
+            result = integration_test()
+            print("E2E_TEST_OK", result["result"], "source_key=" + str(result["source_key"]),
+                  "top25=" + str(result["top25"]), "observations=" + str(result["observations"]),
+                  "page_id=" + str(result["page_id"]), "page_url=" + str(result["page_url"]))
             return 0
         if local_today.weekday() != 0:
             raise ValueError("Production date is not a Beijing Monday; no backfill")
