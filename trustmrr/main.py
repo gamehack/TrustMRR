@@ -17,7 +17,7 @@ from .core import (
     DISCOVERY_URL, SHANGHAI, normalize_top25, previous_week_changes,
     week_start,
 )
-from .notion_sync import read_existing_ready, sync_article
+from .notion_sync import check_parent_access, read_existing_ready, sync_article
 from .report_markdown import render_report_markdown
 from .services import ai_insights, authorize, enabled, http_json
 
@@ -174,11 +174,48 @@ def produce(monday: date) -> list[str]:
     return results
 
 
+def preflight(target_monday: date | None = None) -> dict:
+    """Exercise live TrustMRR, OmniRoute and Notion-read paths without writing."""
+    authorize("TRUSTMRR_RESEARCH_AUTHORIZED", "TRUSTMRR_AI_AUTHORIZED")
+    if os.getenv("NOTION_PARENT_PAGE_ID", "").lower() != PARENT_ID:
+        raise ValueError("Unexpected Notion parent page")
+    notion_status = check_parent_access()
+    payload = http_json(DISCOVERY_URL)
+    rows = normalize_top25(payload)
+    insights = ai_insights(rows, {
+        "mode": "live preflight; no previous-week comparison; no report will be archived",
+        "rank_delta": "not calculated in preflight",
+    }, "weekly")
+    if target_monday is None:
+        target_monday = week_start(datetime.now(SHANGHAI).date() + timedelta(days=7))
+    if target_monday.weekday() != 0:
+        raise ValueError("Preflight target period must be a Monday")
+    period = "weekly:" + target_monday.isoformat()
+    ranked = previous_week_changes(rows, [])
+    markdown = render_report_markdown(
+        period=period,
+        title=title_for(period, monthly=False),
+        records=ranked,
+        insights=insights,
+        monthly=False,
+    )
+    if markdown.count("TrustMRR 来源") != 25:
+        raise ValueError("Preflight report rendering did not produce exactly 25 sources")
+    return {
+        "notion_read": bool(notion_status.get("readable")),
+        "trustmrr_top25": len(rows),
+        "ai_observations": len(insights["observations"]),
+        "markdown_chars": len(markdown),
+        "target_period": target_monday.isoformat(),
+        "notion_write": False,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="TrustMRR GitHub Actions Notion producer")
     parser.add_argument(
-        "command", choices=("check", "produce"),
-        help="check verifies safe Notion access only; produce makes canonical READY articles",
+        "command", choices=("check", "preflight", "produce"),
+        help="check verifies Notion read access; preflight tests live APIs without writes; produce writes READY articles",
     )
     args = parser.parse_args(argv)
     try:
@@ -187,9 +224,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "check":
             if os.getenv("NOTION_PARENT_PAGE_ID", "").lower() != PARENT_ID:
                 raise ValueError("Unexpected Notion parent page")
-            key, prefix, _ = report_identity("weekly", monday)
-            page = read_existing_ready(key, prefix)
-            print("CHECK_OK Notion readable", "READY" if page else "NO_CURRENT_READY")
+            status = check_parent_access()
+            print("CHECK_OK Notion parent readable", "sampled_children=" + str(status["sampled_children"]))
+            return 0
+        if args.command == "preflight":
+            result = preflight()
+            print("PREFLIGHT_OK", "notion_read=ok", "trustmrr_top25=" + str(result["trustmrr_top25"]),
+                  "ai_observations=" + str(result["ai_observations"]),
+                  "markdown_chars=" + str(result["markdown_chars"]),
+                  "target_period=" + result["target_period"], "notion_write=not_attempted")
             return 0
         if local_today.weekday() != 0:
             raise ValueError("Production date is not a Beijing Monday; no backfill")
