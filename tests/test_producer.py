@@ -23,8 +23,8 @@ def sample_rows():
 
 class NotionMarkdownTests(unittest.TestCase):
     def test_markdown_v2_bold_autolinks_and_dollar_escapes_are_equivalent(self):
-        expected = "1. **ECOMSTATEMENT\\.COM**\\n   - Price US\\$2.00\\n"
-        actual = "1. [<b>ECOMSTATEMENT.COM</b>](http://ECOMSTATEMENT.COM)\\n   - Price US\\$2.00\\n"
+        expected = "1. **ECOMSTATEMENT\\.COM**\n   - Price US\\$2.00\n"
+        actual = "1. [<b>ECOMSTATEMENT.COM</b>](http://ECOMSTATEMENT.COM)\n   - Price US\\$2.00\n"
         self.assertEqual(_comparison_form(expected), _comparison_form(actual))
     def test_markdown_v2_code_tags_and_escaped_underscores_are_equivalent(self):
         expected = "> Archive key: `trustmrr-test:2026-11-07`.\n\n- source_key\n"
