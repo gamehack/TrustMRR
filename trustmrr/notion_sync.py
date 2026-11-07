@@ -220,8 +220,8 @@ def sync_article(*, source_key: str, title: str, markdown: str,
     # Remove the existing H1 to avoid a duplicate article title in the body.
     content = re.sub(r"^#\s+[^\n]+\n+", "", markdown, count=1)
     header = (
-        "> 潜界 AI 文章归档。来源唯一键：`" + source_key + "`。"
-        " 原文 SHA-256：`" + original_digest + "`。\n\n"
+        "> 潜界 AI 文章归档。来源唯一键：" + source_key + "。"
+        " 原文 SHA-256：" + original_digest + "。\n\n"
     )
     document = _canonical(header + content)
     if len(document.encode("utf-8")) > _MAX_MARKDOWN:
