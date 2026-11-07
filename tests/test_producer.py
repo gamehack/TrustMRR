@@ -28,13 +28,13 @@ class NotionMarkdownTests(unittest.TestCase):
     })
     def test_historical_reader_accepts_escaped_ready_marker(self):
         source_key = "trustmrr-e2e-test-v2:2026-11-07"
-        body = "> archive header\\n\\narticle body\\n"
+        body = "> archive header\n\narticle body\n"
         digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
         marker = f"QJAI_PUBLISH_READY v=1 source_key={source_key} content_sha256={digest}"
-        escaped_marker = marker.replace("_", r"\\_")
+        escaped_marker = marker.replace("_", r"\_")
         with patch("trustmrr.notion_sync._find_existing", return_value={
             "id": "4119e605-ccf8-8160-8303-d977804da331", "title": "test",
-        }), patch("trustmrr.notion_sync._read_markdown", return_value=body + escaped_marker + "\\n"):
+        }), patch("trustmrr.notion_sync._read_markdown", return_value=body + escaped_marker + "\n"):
             result = read_existing_ready(source_key, "test-prefix")
         self.assertEqual(result, body)
     def test_markdown_v2_bold_autolinks_and_dollar_escapes_are_equivalent(self):
