@@ -11,7 +11,7 @@ from trustmrr.main import (
     report_identity, prior_ranking, month_candidate, produce, historical_week, preflight, write_test, integration_test,
 )
 from trustmrr.report_markdown import render_report_markdown
-from trustmrr.notion_sync import _comparison_form
+from trustmrr.notion_sync import _comparison_form, read_existing_ready
 
 
 def sample_rows():
@@ -22,6 +22,21 @@ def sample_rows():
 
 
 class NotionMarkdownTests(unittest.TestCase):
+    @patch.dict("os.environ", {
+        "NOTION_API_KEY": "secret-test-token-that-is-long-enough",
+        "NOTION_PARENT_PAGE_ID": "4109e605-ccf8-81ed-a46c-f9ab95538f5b",
+    })
+    def test_historical_reader_accepts_escaped_ready_marker(self):
+        source_key = "trustmrr-e2e-test-v2:2026-11-07"
+        body = "> archive header\\n\\narticle body\\n"
+        digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+        marker = f"QJAI_PUBLISH_READY v=1 source_key={source_key} content_sha256={digest}"
+        escaped_marker = marker.replace("_", r"\\_")
+        with patch("trustmrr.notion_sync._find_existing", return_value={
+            "id": "4119e605-ccf8-8160-8303-d977804da331", "title": "test",
+        }), patch("trustmrr.notion_sync._read_markdown", return_value=body + escaped_marker + "\\n"):
+            result = read_existing_ready(source_key, "test-prefix")
+        self.assertEqual(result, body)
     def test_markdown_v2_bold_autolinks_and_dollar_escapes_are_equivalent(self):
         expected = "1. **ECOMSTATEMENT\\.COM**\n   - Price US\\$2.00\n"
         actual = "1. [<b>ECOMSTATEMENT.COM</b>](http://ECOMSTATEMENT.COM)\n   - Price US\\$2.00\n"
