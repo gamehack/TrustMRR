@@ -195,7 +195,7 @@ def write_test() -> dict[str, str]:
 
 
 def integration_test() -> dict[str, object]:
-    """Run real TrustMRR -> OmniRoute -> report render -> Notion READY end to end (isolated test)."""
+    """Run real TrustMRR -> OmniRoute -> report render -> Notion READY end to end (isolated test; v1)."""
     source_key = "trustmrr-e2e-test:2026-11-07"
     unique_prefix = "联调测试｜2026-11-07-e2e｜"
     title = unique_prefix + "真实 Top25 与 AI 研究完整链路"
