@@ -8,7 +8,7 @@ from trustmrr.core import (
     normalize_top25, previous_week_changes, week_start,
 )
 from trustmrr.main import (
-    report_identity, prior_ranking, month_candidate, produce, historical_week, preflight,
+    report_identity, prior_ranking, month_candidate, produce, historical_week, preflight, write_test,
 )
 from trustmrr.report_markdown import render_report_markdown
 
@@ -164,6 +164,18 @@ class OrchestrationTests(unittest.TestCase):
         api.assert_called_once()
         model.assert_called_once()
         writer.assert_not_called()
+
+    @patch("trustmrr.main.sync_article", return_value={
+        "result": "created_ready", "source_key": "trustmrr-test:2026-11-07",
+        "page_id": "00000000-0000-4000-8000-000000000001",
+        "page_url": "https://www.notion.so/test",
+    })
+    def test_write_test_uses_dedicated_idempotent_test_identity(self, sync):
+        result = write_test()
+        self.assertEqual(result["source_key"], "trustmrr-test:2026-11-07")
+        self.assertTrue(sync.call_args.kwargs["title"].startswith("联调测试｜2026-11-07｜"))
+        self.assertTrue(sync.call_args.kwargs["unique_prefix"].startswith("联调测试｜"))
+        self.assertIn("不是正式周报", sync.call_args.kwargs["markdown"])
 
     def test_derived_weekly_not_revenue_growth(self):
         current = normalize_top25({"fastestGrowingStartups": sample_rows()})
