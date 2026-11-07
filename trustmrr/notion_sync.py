@@ -135,6 +135,15 @@ def _canonical(markdown: str) -> str:
     return markdown.replace("\r\n", "\n").replace("\r", "\n").rstrip() + "\n"
 
 
+def _comparison_form(markdown: str) -> str:
+    """Compare Markdown v2 semantics across Notion's code-tag/escape serialization."""
+    value = _canonical(markdown)
+    value = re.sub(r"<code>(.*?)</code>", r"`\1`", value, flags=re.DOTALL)
+    # Notion escapes literal Markdown punctuation in readback; those escapes
+    # do not change the rendered content and must not invalidate the digest.
+    return re.sub(r"\\([\\`*_{}\[\]()#+.!|<>~-])", r"\1", value)
+
+
 def _read_markdown(page_id: str, token: str) -> str:
     result = _request(
         "GET", f"/v1/pages/{_uuid(page_id)}/markdown?markdown_version=v2", token
@@ -206,7 +215,7 @@ def sync_article(*, source_key: str, title: str, markdown: str,
         # existing child's immutable READY handshake and content digest.
         existing = _read_markdown(found["id"], token)
         lines = existing.rstrip("\n").split("\n")
-        match = _READY_RE.fullmatch(lines[-1]) if lines else None
+        match = _READY_RE.fullmatch(lines[-1].strip().replace(r"\\_", "_")) if lines else None
         if match is None or match.group("source") != source_key:
             raise RuntimeError("Existing Notion period page lacks a valid READY marker; reconcile manually")
         signed_body = _canonical("\n".join(lines[:-1]))
@@ -223,8 +232,8 @@ def sync_article(*, source_key: str, title: str, markdown: str,
     # Remove the existing H1 to avoid a duplicate article title in the body.
     content = re.sub(r"^#\s+[^\n]+\n+", "", markdown, count=1)
     header = (
-        "> 潜界 AI 文章归档。来源唯一键：" + source_key + "。"
-        " 原文 SHA-256：" + original_digest + "。\n\n"
+        "> 潜界 AI 文章归档。来源唯一键：`" + source_key + "`。"
+        " 原文 SHA-256：`" + original_digest + "`。\n\n"
     )
     document = _canonical(header + content)
     if len(document.encode("utf-8")) > _MAX_MARKDOWN:
@@ -241,13 +250,14 @@ def sync_article(*, source_key: str, title: str, markdown: str,
         raise RuntimeError("Notion creation acknowledgement is incomplete")
     _verify_created_page(page_id, parent_id, title, token)
     readback = _read_markdown(page_id, token)
-    if readback != document:
+    if _comparison_form(readback) != _comparison_form(document):
         raise RuntimeError("Notion Markdown readback differs from the archived article")
     verified_digest = hashlib.sha256(readback.encode("utf-8")).hexdigest()
     marker = _append_ready(page_id, source_key, verified_digest, token)
     final = _read_markdown(page_id, token)
     lines = final.rstrip().split("\n")
-    if not lines or not _READY_RE.fullmatch(lines[-1]) or lines[-1] != marker:
+    final_marker = lines[-1].strip().replace(r"\\_", "_") if lines else ""
+    if not lines or not _READY_RE.fullmatch(final_marker) or final_marker != marker:
         raise RuntimeError("Notion READY marker did not round-trip")
     verified_body = _canonical("\n".join(lines[:-1]))
     if verified_body != readback or hashlib.sha256(verified_body.encode("utf-8")).hexdigest() != verified_digest:
