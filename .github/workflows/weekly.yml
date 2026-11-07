@@ -70,6 +70,24 @@ jobs:
       - name: Live API preflight (no Notion writes)
         run: python -m trustmrr.main preflight
 
+  notion-write-test:
+    # Explicit one-off write verification. Creates only a clearly labeled test child page.
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[notion-write-test]')
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NOTION_ENABLE_SYNC: 'true'
+      NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+      NOTION_PARENT_PAGE_ID: 4109e605-ccf8-81ed-a46c-f9ab95538f5b
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create and verify labeled Notion test page
+        run: python -m trustmrr.main write-test
+
   produce:
     # A newly created repo is intentionally inert until cutover is approved.
     # Old systemd weekly timer must be disabled before this gate is enabled.
