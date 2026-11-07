@@ -166,14 +166,14 @@ class OrchestrationTests(unittest.TestCase):
         writer.assert_not_called()
 
     @patch("trustmrr.main.sync_article", return_value={
-        "result": "created_ready", "source_key": "trustmrr-test-v2:2026-11-07",
+        "result": "created_ready", "source_key": "trustmrr-test-v3:2026-11-07",
         "page_id": "00000000-0000-4000-8000-000000000001",
         "page_url": "https://www.notion.so/test",
     })
     def test_write_test_uses_dedicated_idempotent_test_identity(self, sync):
         result = write_test()
-        self.assertEqual(result["source_key"], "trustmrr-test-v2:2026-11-07")
-        self.assertTrue(sync.call_args.kwargs["title"].startswith("联调测试｜2026-11-07-v2｜"))
+        self.assertEqual(result["source_key"], "trustmrr-test-v3:2026-11-07")
+        self.assertTrue(sync.call_args.kwargs["title"].startswith("联调测试｜2026-11-07-v3｜"))
         self.assertTrue(sync.call_args.kwargs["unique_prefix"].startswith("联调测试｜"))
         self.assertIn("不是正式周报", sync.call_args.kwargs["markdown"])
 
