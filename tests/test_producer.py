@@ -8,7 +8,7 @@ from trustmrr.core import (
     normalize_top25, previous_week_changes, week_start,
 )
 from trustmrr.main import (
-    report_identity, prior_ranking, month_candidate, produce, historical_week, preflight, write_test,
+    report_identity, prior_ranking, month_candidate, produce, historical_week, preflight, write_test, integration_test,
 )
 from trustmrr.report_markdown import render_report_markdown
 from trustmrr.notion_sync import _comparison_form
@@ -184,6 +184,36 @@ class OrchestrationTests(unittest.TestCase):
         self.assertTrue(sync.call_args.kwargs["title"].startswith("联调测试｜2026-11-07-v3｜"))
         self.assertTrue(sync.call_args.kwargs["unique_prefix"].startswith("联调测试｜"))
         self.assertIn("不是正式周报", sync.call_args.kwargs["markdown"])
+
+    @patch("trustmrr.main.sync_article", return_value={
+        "result": "created_ready", "source_key": "trustmrr-e2e-test:2026-11-07",
+        "page_id": "00000000-0000-4000-8000-000000000002",
+        "page_url": "https://www.notion.so/e2e-test",
+    })
+    @patch("trustmrr.main.read_existing_ready", return_value=None)
+    @patch("trustmrr.main.ai_insights", return_value={
+        "overview": "真实链路测试概述", "observations": ["观察一", "观察二", "观察三"],
+    })
+    @patch("trustmrr.main.http_json", return_value={"fastestGrowingStartups": sample_rows()})
+    @patch.dict("os.environ", {
+        "TRUSTMRR_RESEARCH_AUTHORIZED": "true",
+        "TRUSTMRR_AI_AUTHORIZED": "true",
+        "NOTION_ENABLE_SYNC": "true",
+        "NOTION_API_KEY": "secret-test-token-that-is-long-enough",
+        "NOTION_PARENT_PAGE_ID": "4109e605-ccf8-81ed-a46c-f9ab95538f5b",
+    })
+    def test_full_integration_test_combines_live_sources_and_notion_write(
+        self, api, model, existing, writer
+    ):
+        result = integration_test()
+        self.assertEqual(result["top25"], 25)
+        self.assertEqual(result["observations"], 3)
+        self.assertEqual(result["source_key"], "trustmrr-e2e-test:2026-11-07")
+        self.assertIn("TrustMRR 增长 Top 25", writer.call_args.kwargs["markdown"])
+        api.assert_called_once()
+        model.assert_called_once()
+        existing.assert_called_once()
+        writer.assert_called_once()
 
     def test_derived_weekly_not_revenue_growth(self):
         current = normalize_top25({"fastestGrowingStartups": sample_rows()})
