@@ -253,6 +253,18 @@ def sync_article(*, source_key: str, title: str, markdown: str,
             "page_id": page_id, "page_url": page_url}
 
 
+def check_parent_access() -> dict:
+    """Verify the Notion token can read the configured archive parent; no writes."""
+    token = os.getenv("NOTION_API_KEY", "").strip()
+    if len(token) < 20:
+        raise ValueError("NOTION_API_KEY is not configured")
+    parent_id = _uuid(os.getenv("NOTION_PARENT_PAGE_ID", ""))
+    result = _request("GET", f"/v1/blocks/{parent_id}/children?page_size=1", token)
+    if not isinstance(result.get("results"), list) or not isinstance(result.get("has_more"), bool):
+        raise RuntimeError("Notion parent read response was incomplete")
+    return {"readable": True, "sampled_children": len(result["results"])}
+
+
 def read_existing_ready(source_key: str, unique_prefix: str) -> str | None:
     """Read only one exact report period from the canonical Notion parent."""
     token = os.getenv("NOTION_API_KEY", "").strip()
