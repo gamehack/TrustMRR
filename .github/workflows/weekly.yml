@@ -111,32 +111,6 @@ jobs:
       - name: Run full live research and Notion READY integration
         run: python -m trustmrr.main integration-test
 
-  notion-debug-e2e:
-    # Read-only diagnostics for the already-created E2E test page; never prints credentials.
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[notion-debug-e2e]')
-    needs: test
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    env:
-      NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
-      NOTION_PARENT_PAGE_ID: 4109e605-ccf8-81ed-a46c-f9ab95538f5b
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Inspect exact E2E Markdown v2 readback
-        run: |
-          python - <<'PY'
-          import os
-          from trustmrr.notion_sync import _read_markdown
-          page_id = "4119e605-ccf8-814c-9caddcdd0785092c"
-          markdown = _read_markdown(page_id, os.environ["NOTION_API_KEY"])
-          print("READBACK_LENGTH", len(markdown))
-          for index, line in enumerate(markdown.splitlines(), 1):
-              print("READBACK_LINE", index, repr(line))
-          PY
-
   produce:
     # A newly created repo is intentionally inert until cutover is approved.
     # Old systemd weekly timer must be disabled before this gate is enabled.
