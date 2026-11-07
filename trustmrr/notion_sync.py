@@ -181,6 +181,9 @@ def sync_article(*, source_key: str, title: str, markdown: str,
                  unique_prefix: str) -> dict[str, str]:
     """Create one dated child page, or confirm its existence without overwriting.
 
+    Notion Markdown v2 readback canonicalizes inline code and escaped punctuation;
+    keep generated metadata prose plain to preserve exact content round-trips.
+
     No broad search and no upsert: an ambiguous create may only be retried after
     re-reading all children. The parent must be a dedicated article-only page.
     """
