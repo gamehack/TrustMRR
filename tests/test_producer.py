@@ -11,6 +11,7 @@ from trustmrr.main import (
     report_identity, prior_ranking, month_candidate, produce, historical_week, preflight, write_test,
 )
 from trustmrr.report_markdown import render_report_markdown
+from trustmrr.notion_sync import _comparison_form
 
 
 def sample_rows():
@@ -18,6 +19,13 @@ def sample_rows():
              "description": "A useful tool", "growth30d": 100-i,
              "revenue": {"last30Days": i * 101, "mrr": i * 23}}
             for i in range(1, 26)]
+
+
+class NotionMarkdownTests(unittest.TestCase):
+    def test_markdown_v2_code_tags_and_escaped_underscores_are_equivalent(self):
+        expected = "> Archive key: `trustmrr-test:2026-11-07`.\n\n- source_key\n"
+        actual = "> Archive key: <code>trustmrr-test:2026-11-07</code>.\n\n- source\\_key\n"
+        self.assertEqual(_comparison_form(expected), _comparison_form(actual))
 
 
 class NormalizeTests(unittest.TestCase):
