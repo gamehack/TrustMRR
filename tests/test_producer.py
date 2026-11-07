@@ -154,12 +154,9 @@ class OrchestrationTests(unittest.TestCase):
             "NOTION_API_KEY": "secret-test-token-that-is-long-enough",
             "NOTION_PARENT_PAGE_ID": "4109e605-ccf8-81ed-a46c-f9ab95538f5b",
         }
-        with patch.dict(os.environ, env), \\
-             patch("trustmrr.main.check_parent_access", return_value={"readable": True, "sampled_children": 1}) as notion, \\
-             patch("trustmrr.main.http_json", return_value={"fastestGrowingStartups": sample_rows()}) as api, \\
-             patch("trustmrr.main.ai_insights", return_value={"overview": "概述", "observations": ["一", "二", "三"]}) as model, \\
-             patch("trustmrr.main.sync_article") as writer:
-            result = preflight(date(2026, 11, 9))
+        with patch.dict(os.environ, env):
+            with patch("trustmrr.main.check_parent_access", return_value={"readable": True, "sampled_children": 1}) as notion, patch("trustmrr.main.http_json", return_value={"fastestGrowingStartups": sample_rows()}) as api, patch("trustmrr.main.ai_insights", return_value={"overview": "概述", "observations": ["一", "二", "三"]}) as model, patch("trustmrr.main.sync_article") as writer:
+                result = preflight(date(2026, 11, 9))
         self.assertEqual(result["trustmrr_top25"], 25)
         self.assertEqual(result["target_period"], "2026-11-09")
         self.assertFalse(result["notion_write"])
