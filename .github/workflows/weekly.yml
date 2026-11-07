@@ -47,6 +47,29 @@ jobs:
           NOTION_PARENT_PAGE_ID: 4109e605-ccf8-81ed-a46c-f9ab95538f5b
         run: python -m trustmrr.main check
 
+  live-preflight:
+    # One-off live integration run is opt-in via an explicit commit message.
+    # It reads Notion, fetches TrustMRR, calls OmniRoute, and never writes a page.
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[live-preflight]')
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TRUSTMRR_RESEARCH_AUTHORIZED: ${{ vars.TRUSTMRR_RESEARCH_AUTHORIZED }}
+      TRUSTMRR_AI_AUTHORIZED: ${{ vars.TRUSTMRR_AI_AUTHORIZED }}
+      NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+      NOTION_PARENT_PAGE_ID: 4109e605-ccf8-81ed-a46c-f9ab95538f5b
+      OMNIROUTE_BASE_URL: ${{ vars.OMNIROUTE_BASE_URL }}
+      OMNIROUTE_MODEL: ${{ vars.OMNIROUTE_MODEL }}
+      OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Live API preflight (no Notion writes)
+        run: python -m trustmrr.main preflight
+
   produce:
     # A newly created repo is intentionally inert until cutover is approved.
     # Old systemd weekly timer must be disabled before this gate is enabled.
