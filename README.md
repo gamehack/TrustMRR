@@ -15,7 +15,7 @@
 
 1. 在新仓库 Settings → Secrets and variables → Actions → **Repository secrets** 配置：NOTION_API_KEY、OMNIROUTE_API_KEY。
 2. 在 **Repository variables** 配置：OMNIROUTE_BASE_URL、OMNIROUTE_MODEL、TRUSTMRR_RESEARCH_AUTHORIZED=true、TRUSTMRR_AI_AUTHORIZED=true。授权开关仅表示用户已取得对应用途的书面许可，不意味着由本项目自行取得。
-3. 先在 Actions 中手动运行「TrustMRR Weekly Notion Producer」的 workflow_dispatch：只执行离线测试与 Notion **只读**检查；不会请求 TrustMRR 数据、调用 AI 或创建文章。
+3. 先通过显式提交消息包含 `[live-preflight]` 触发一次真实接口预检：只读 Notion 专栏、请求 TrustMRR Top25、调用 OmniRoute、校验文章渲染；不创建 Notion 页面，不写 READY。后续也可手动 workflow_dispatch 执行只读 Notion 检查。
 4. **正式切换前**先禁用硅谷旧 qjai-trustmrr-weekly.timer，确认 inactive/disabled；保留旧项目回滚材料及渠道幂等记录。确保新旧上游不会同时运行。
 5. 之后才将新仓库 Repository variable **TRUSTMRR_PRODUCTION_ENABLED=true**，由下一个周一 01:00 GitHub Actions 自然运行。Notion 必须完整 READY；03:00 下游再投递双草稿。确认 Notion/微信/CMS/定时日志均通过后才允许删除旧上游项目服务器目录、旧定时器、旧仓库和安全确认的专属备份。
 6. 若首次执行失败，保持旧项目停用以防重复投递；检查失败原因并协调人工恢复，不自动重放/补投或恢复两条链路并行。
@@ -28,9 +28,10 @@ Python 3.12+，仅标准库：
 
     python -m unittest discover -s tests -v
     python -m trustmrr.main check
+    python -m trustmrr.main preflight
     python -m trustmrr.main produce
 
-check 只验证 Notion 页面访问与已经存在的 READY；produce 仅允许北京时间周一执行，且要求 TRUSTMRR_PRODUCTION_ENABLED=true、TRUSTMRR_RESEARCH_AUTHORIZED=true、TRUSTMRR_AI_AUTHORIZED=true、NOTION_ENABLE_SYNC=true、NOTION_AUTOSYNC_AFTER_GENERATION=true。Notion 父页面固定为 4109e605-ccf8-81ed-a46c-f9ab95538f5b，不允许运行时意外指向其它页面。
+check 只验证 Notion 父页面只读权限；preflight 真实调用 TrustMRR 与 OmniRoute 并检查报告渲染，明确不写 Notion；produce 仅允许北京时间周一执行，且要求 TRUSTMRR_PRODUCTION_ENABLED=true、TRUSTMRR_RESEARCH_AUTHORIZED=true、TRUSTMRR_AI_AUTHORIZED=true、NOTION_ENABLE_SYNC=true、NOTION_AUTOSYNC_AFTER_GENERATION=true。Notion 父页面固定为 4109e605-ccf8-81ed-a46c-f9ab95538f5b，不允许运行时意外指向其它页面。
 
 ## 运行协议
 
