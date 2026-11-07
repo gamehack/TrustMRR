@@ -88,37 +88,6 @@ jobs:
       - name: Create and verify labeled Notion test page
         run: python -m trustmrr.main write-test
 
-  notion-debug-readback:
-    # Temporary diagnostics for the single labeled integration-test page; never prints credentials.
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[notion-debug-readback]')
-    needs: test
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    env:
-      NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
-      NOTION_PARENT_PAGE_ID: 4109e605-ccf8-81ed-a46c-f9ab95538f5b
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Inspect the existing test page Markdown readback
-        run: |
-          python - <<'PY'
-          import os
-          from trustmrr.notion_sync import _find_existing, _read_markdown
-          parent = os.environ["NOTION_PARENT_PAGE_ID"]
-          token = os.environ["NOTION_API_KEY"]
-          found = _find_existing(parent, "联调测试｜2026-11-07｜", token)
-          if found is None:
-              raise SystemExit("TEST_PAGE_NOT_FOUND")
-          print("TEST_PAGE_FOUND", found["id"])
-          markdown = _read_markdown(found["id"], token)
-          print("READBACK_LENGTH", len(markdown))
-          for index, line in enumerate(markdown.splitlines(), 1):
-              print("READBACK_LINE", index, repr(line))
-          PY
-
   produce:
     # A newly created repo is intentionally inert until cutover is approved.
     # Old systemd weekly timer must be disabled before this gate is enabled.
