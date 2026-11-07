@@ -8,7 +8,7 @@ from trustmrr.core import (
     normalize_top25, previous_week_changes, week_start,
 )
 from trustmrr.main import (
-    report_identity, prior_ranking, month_candidate, produce, historical_week,
+    report_identity, prior_ranking, month_candidate, produce, historical_week, preflight,
 )
 from trustmrr.report_markdown import render_report_markdown
 
@@ -144,6 +144,29 @@ class OrchestrationTests(unittest.TestCase):
     def test_tampered_history_is_not_trusted(self, read):
         with self.assertRaises(RuntimeError):
             historical_week(date(2026, 11, 2))
+
+    def test_live_preflight_runs_three_integrations_without_writing(self):
+        from unittest.mock import patch
+        import os
+        env = {
+            "TRUSTMRR_RESEARCH_AUTHORIZED": "true",
+            "TRUSTMRR_AI_AUTHORIZED": "true",
+            "NOTION_API_KEY": "secret-test-token-that-is-long-enough",
+            "NOTION_PARENT_PAGE_ID": "4109e605-ccf8-81ed-a46c-f9ab95538f5b",
+        }
+        with patch.dict(os.environ, env), \\
+             patch("trustmrr.main.check_parent_access", return_value={"readable": True, "sampled_children": 1}) as notion, \\
+             patch("trustmrr.main.http_json", return_value={"fastestGrowingStartups": sample_rows()}) as api, \\
+             patch("trustmrr.main.ai_insights", return_value={"overview": "概述", "observations": ["一", "二", "三"]}) as model, \\
+             patch("trustmrr.main.sync_article") as writer:
+            result = preflight(date(2026, 11, 9))
+        self.assertEqual(result["trustmrr_top25"], 25)
+        self.assertEqual(result["target_period"], "2026-11-09")
+        self.assertFalse(result["notion_write"])
+        notion.assert_called_once()
+        api.assert_called_once()
+        model.assert_called_once()
+        writer.assert_not_called()
 
     def test_derived_weekly_not_revenue_growth(self):
         current = normalize_top25({"fastestGrowingStartups": sample_rows()})
