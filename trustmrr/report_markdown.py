@@ -119,14 +119,15 @@ def render_report_markdown(
                 delta = prior_rank - rank
                 change = f"上周第 {prior_rank} 位；排名变化 {delta:+d}"
             description = row.get("description")
+            nested_indent = " " * (len(str(rank)) + 2)
             lines.extend([
                 f"{rank}. **{name}**",
-                f"   - 近30日收入增长：{growth}；近30日收入：{revenue}；MRR：{mrr}",
-                f"   - {change}",
+                f"{nested_indent}- 近30日收入增长：{growth}；近30日收入：{revenue}；MRR：{mrr}",
+                f"{nested_indent}- {change}",
             ])
             if description:
-                lines.append(f"   - {_escape_markdown(description)}")
-            lines.append(f"   - [TrustMRR 来源](https://trustmrr.com/startup/{quote(slug, safe='')})")
+                lines.append(f"{nested_indent}- {_escape_markdown(description)}")
+            lines.append(f"{nested_indent}- [TrustMRR 来源](https://trustmrr.com/startup/{quote(slug, safe='')})")
 
     lines.extend([
         "",
