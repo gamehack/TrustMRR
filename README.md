@@ -16,9 +16,9 @@
 1. 在新仓库 Settings → Secrets and variables → Actions → **Repository secrets** 配置：NOTION_API_KEY、OMNIROUTE_API_KEY。
 2. 在 **Repository variables** 配置：OMNIROUTE_BASE_URL、OMNIROUTE_MODEL、TRUSTMRR_RESEARCH_AUTHORIZED=true、TRUSTMRR_AI_AUTHORIZED=true。授权开关仅表示用户已取得对应用途的书面许可，不意味着由本项目自行取得。
 3. 先通过显式提交消息包含 `[live-preflight]` 触发一次真实接口预检：只读 Notion 专栏、请求 TrustMRR Top25、调用 OmniRoute、校验文章渲染；不创建 Notion 页面，不写 READY。后续也可手动 workflow_dispatch 执行只读 Notion 检查。 2026-11-07 首次真实预检已通过：[run 42324977476](https://github.com/gamehack/TrustMRR/actions/runs/42324977476)，Notion 只读访问 OK、TrustMRR 返回 25 条、OmniRoute 返回 5 条观察、文章渲染通过。随后 [run 42326546993](https://github.com/gamehack/TrustMRR/actions/runs/42326546993) 完成 Notion 写入与 READY 幂等测试。最后 [完整端到端 run 42327562166](https://github.com/gamehack/TrustMRR/actions/runs/42327562166) 真实调用 TrustMRR Top25、OmniRoute、渲染 25 条报告并写入 Notion READY，结果 created_ready；[重复执行 run 42327861094](https://github.com/gamehack/TrustMRR/actions/runs/42327861094) 返回 duplicate_ready，不重复调用 AI 或创建页面。完整报告测试页：[E2E v2](https://app.notion.com/p/4119e605ccf881608303d977804da331)。
-4. **正式切换前**先禁用硅谷旧 qjai-trustmrr-weekly.timer，确认 inactive/disabled；保留旧项目回滚材料及渠道幂等记录。确保新旧上游不会同时运行。
-5. 之后才将新仓库 Repository variable **TRUSTMRR_PRODUCTION_ENABLED=true**，由下一个周一 01:00 GitHub Actions 自然运行。Notion 必须完整 READY；03:00 下游再投递双草稿。确认 Notion/微信/CMS/定时日志均通过后才允许删除旧上游项目服务器目录、旧定时器、旧仓库和安全确认的专属备份。
-6. 若首次执行失败，保持旧项目停用以防重复投递；检查失败原因并协调人工恢复，不自动重放/补投或恢复两条链路并行。
+4. **旧项目服务器侧已于 2026-11-07 完成退役**：旧 qjai-trustmrr-weekly.timer 已 disable --now；service/timer unit 已删除并 daemon-reload；/opt/qjai-TrustMRR-mp-publisher 已删除；未发现专属备份；专属 Docker 镜像在确认零容器引用后删除。其他容器、traefik_default、qjai-text-publisher、qjai-cms 均未受影响。详细结果见 [Notion 旧项目退役记录](https://app.notion.com/p/40b9e605ccf881c28494d6750137a87b)。
+5. **剩余启动动作由仓库管理员在 GitHub UI 完成**：进入 Settings → Secrets and variables → Actions → Repository variables，将 TRUSTMRR_PRODUCTION_ENABLED 设置为 true。当前 GitHub Actions GITHUB_TOKEN 不具备变量管理权限，因此临时自动设置任务已移除；生产门禁仍保持关闭。另在旧私有仓库 gamehack/qjai-TrustMRR-mp-publisher 的 Settings → General → Danger Zone 执行 Delete this repository，完成旧代码仓库清理。新项目变量启用后，由下一个周一 01:00 GitHub Actions 自然运行；Notion 必须完整 READY，03:00 下游再投递双草稿。
+6. 若首次自然执行失败，保持旧项目停用；检查失败原因并人工处理，不自动重放/补投，也不恢复旧链路并行。
 
 > 2026-11-09 是下一次周一。GitHub schedule 可能延迟，03:00 前未 READY 时统一发布器安全跳过，不会改用旧报告补发。生产开关未打开时 schedule 只跑离线测试，不创建文章。
 
